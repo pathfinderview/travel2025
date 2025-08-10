@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Italy Trip — Oct 9–20, 2025</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body, #map { height: 100%; margin: 0; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Map setup
+const map = L.map('map').setView([43.5, 13.5], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+// Helper to add markers with popups
+function addStop(lat, lon, title, html) {
+    L.marker([lat, lon]).addTo(map).bindPopup(`<h3>${title}</h3>${html}`);
+}
+
+// Lucerne
+addStop(47.0502, 8.3093, 'Lucerne (Oct 9–13)',
+    `<b>Highlights:</b> Chapel Bridge, Old Town, Mount Rigi, Mount Titlis<br>
+     <b>Special for:</b> Lake + mountain mix, walkable centre<br>
+     <b>Notes:</b> Morning boats for best views`);
+
+// Zurich Airport
+addStop(47.4515, 8.5646, 'Zurich Airport',
+    'Flight to Bari on Oct 13 (~1h50)');
+
+// Bari
+addStop(41.1171, 16.8719, 'Bari',
+    'Hub for Monopoli — 30 min by train');
+
+// Monopoli
+addStop(40.9508, 17.3026, 'Monopoli (Oct 13–19)',
+    `<b>Highlights:</b> Cala Porta Vecchia, Polignano a Mare, Alberobello, Ostuni<br>
+     <b>Special for:</b> Cadaqués-style coves & piazzas<br>
+     <b>Day trips:</b> Polignano, Alberobello, Ostuni`);
+
+// Rome
+addStop(41.9028, 12.4964, 'Rome (Oct 19–20)',
+    `<b>Highlights:</b> Monti quarter, Trevi Fountain, Villa Borghese<br>
+     <b>Special for:</b> Ancient sights + relaxed neighbourhood vibe`);
+
+// Routes with distances
+L.polyline([
+    [47.0502, 8.3093], // Lucerne
+    [47.4515, 8.5646]  // Zurich Airport
+], {color: 'blue'}).bindTooltip('Lucerne → Zurich Airport (~67 km, 1h10 train)').addTo(map);
+
+L.polyline([
+    [47.4515, 8.5646], // Zurich Airport
+    [41.138, 16.760]   // Bari (approx)
+], {color: 'blue'}).bindTooltip('Zurich → Bari flight (~950 km, 1h50)').addTo(map);
+
+L.polyline([
+    [41.1171, 16.8719], // Bari
+    [40.9508, 17.3026]  // Monopoli
+], {color: 'green'}).bindTooltip('Bari → Monopoli (~45 km, 30 min train)').addTo(map);
+
+L.polyline([
+    [40.9508, 17.3026], // Monopoli
+    [41.9028, 12.4964]  // Rome
+], {color: 'red'}).bindTooltip('Monopoli → Rome (~490 km, 4h train)').addTo(map);
+</script>
+</body>
+</html>
