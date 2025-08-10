@@ -1,266 +1,475 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Switzerland → Puglia → Rome — Oct 9–20, 2025 (Planning Map)</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Switzerland → Puglia → Rome — Oct 9–20, 2025</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-  html,body,#map{height:100%;margin:0}
-  .legend{position:absolute;bottom:16px;left:16px;z-index:9999;background:#fff;border-radius:10px;
-          box-shadow:0 6px 30px rgba(0,0,0,.12);padding:10px 12px;font:13px/1.3 system-ui,-apple-system,Segoi UI,Roboto,Arial}
-  .legend h4{margin:.2rem 0 .5rem .1rem;font-weight:700;font-size:13px}
-  .lg-row{display:flex;align-items:center;gap:8px;margin:.25rem 0}
-  .chip{width:12px;height:12px;border-radius:3px;display:inline-block}
-  .pill{display:inline-block;padding:2px 6px;border-radius:999px;font-size:12px;background:#eef4ff;color:#0b3a99;border:1px solid #d7e5ff}
-  .popup h3{margin:.2rem 0 .4rem;font-weight:700;font-size:15px}
-  .muted{color:#666;font-size:12.5px;margin:.25rem 0 .35rem}
-  .popup ul{margin:.25rem 0 .1rem 1rem;padding:0}
-  .popup li{margin:.15rem 0}
-  .popup a{color:#0b6cff;text-decoration:none}
-  .popup a:hover{text-decoration:underline}
-  .key{font-weight:600}
+  :root{
+    --bg:#0b0e11; --panel:#12161b; --muted:#9aa4af; --ink:#e8eef6; --accent:#82aaff;
+    --chip:#202632; --ok:#66C08B; --fly:#7B9FF2; --train:#3EA6D6; --onward:#FF7B6B;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  #app{display:grid;grid-template-columns:300px 1fr;grid-template-rows:100vh}
+  /* Left timeline */
+  #left{background:var(--panel);border-right:1px solid #1f2430;overflow:auto}
+  .brand{padding:14px 16px;border-bottom:1px solid #1f2430}
+  .brand h1{margin:0;font-size:16px;font-weight:700}
+  .brand .dates{color:var(--muted);font-size:12px;margin-top:4px}
+  .day{padding:10px 12px;border-left:3px solid transparent;cursor:pointer}
+  .day:hover{background:#0e1318}
+  .day.active{background:#0e1318;border-left-color:var(--accent)}
+  .day .t{font-weight:700}
+  .day .s{color:var(--muted);font-size:12px}
+  .legend{padding:10px 12px;border-top:1px solid #1f2430}
+  .chip{display:inline-block;padding:2px 6px;border-radius:999px;background:var(--chip);margin-right:6px;color:#cbd5e1}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  /* Right: map + panel */
+  #right{position:relative}
+  #map{position:absolute;inset:0}
+  #panel{
+    position:absolute;right:14px;top:14px;width:min(380px,45vw);max-height:calc(100% - 28px);
+    overflow:auto;background:var(--panel);border:1px solid #1f2430;border-radius:12px;
+    box-shadow:0 8px 40px rgba(0,0,0,.35)
+  }
+  .p-hdr{padding:12px 14px;border-bottom:1px solid #1f2430}
+  .p-hdr h2{margin:0;font-size:16px}
+  .p-hdr .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  .section{padding:10px 14px;border-bottom:1px solid #1f2430}
+  .section h3{margin:0 0 6px;font-size:13px;color:#cbd5e1}
+  .grid{display:grid;grid-template-columns:1fr;gap:8px}
+  .card{
+    background:#0e1318;border:1px solid #1f2430;border-radius:10px;padding:10px
+  }
+  .row{display:flex;justify-content:space-between;gap:8px}
+  .muted{color:var(--muted)}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .badge{font-size:11px;background:#0c1220;border:1px solid #1f2430;border-radius:999px;padding:2px 6px;color:#cbd5e1}
+  .tag{display:inline-block;background:#111827;border:1px solid #1f2430;border-radius:6px;padding:2px 6px;margin-right:6px;font-size:11px;color:#cbd5e1}
+  .flow{display:flex;gap:8px;flex-wrap:wrap}
+  .flow .seg{background:#0c1220;border:1px solid #1f2430;border-radius:999px;padding:2px 8px;font-size:11px}
+  .seg.train{border-color:var(--train)}
+  .seg.fly{border-color:var(--fly)}
+  .seg.onward{border-color:var(--onward)}
+  /* mobile */
+  @media(max-width:1000px){ #app{grid-template-columns:1fr} #left{display:none} #panel{left:14px;width:calc(100% - 28px)} }
 </style>
 </head>
 <body>
-<div id="map"></div>
+<div id="app">
+  <aside id="left">
+    <div class="brand">
+      <h1>Trip Planner · Oct 9–20</h1>
+      <div class="dates">Switzerland → Puglia → Rome</div>
+    </div>
+    <div id="timeline"></div>
+    <div class="legend">
+      <div style="margin-bottom:6px">Legend</div>
+      <div><span class="dot" style="background:#3EA6D6"></span><span class="muted">Train</span></div>
+      <div><span class="dot" style="background:#7B9FF2"></span><span class="muted">Flight</span></div>
+      <div><span class="dot" style="background:#66C08B"></span><span class="muted">Regional</span></div>
+      <div><span class="dot" style="background:#FF7B6B"></span><span class="muted">Onward leg</span></div>
+      <div style="margin-top:8px">
+        <span class="chip">Base</span>
+        <span class="chip">Day Trip</span>
+        <span class="chip">Food</span>
+        <span class="chip">Hub</span>
+      </div>
+    </div>
+  </aside>
+
+  <main id="right">
+    <div id="map"></div>
+    <div id="panel">
+      <div class="p-hdr">
+        <h2 id="panel-title">Pick a day on the left</h2>
+        <div id="panel-sub" class="sub">You’ll see times, travel, food & nearby places here.</div>
+      </div>
+      <div id="panel-body"></div>
+    </div>
+  </main>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ---- Base map ----
-const map = L.map('map').setView([44.2, 12.5], 6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  maxZoom: 18, attribution:'&copy; OpenStreetMap contributors'
-}).addTo(map);
+/* ===================== DATA ===================== */
+// Bases & hubs
+const P = {
+  Lucerne:[47.0502,8.3093], ZRH:[47.4515,8.5646], Engelberg:[46.821,8.405],
+  Vitznau:[47.013,8.487], Weggis:[47.032,8.432], RigiKaltbad:[47.045,8.465], RigiKulm:[47.058,8.486],
+  Bari:[41.1171,16.8719], Monopoli:[40.9508,17.3026], Polignano:[40.9963,17.2208],
+  Alberobello:[40.7833,17.2333], Locorotondo:[40.755,17.327], Ostuni:[40.7310,17.5776],
+  Rome:[41.9028,12.4964], FCO:[41.7999,12.2462]
+};
 
-// ---- Icon helpers ----
-function mk(color){ return L.icon({
-  iconUrl:`https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-  iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34],
-  shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png', shadowSize:[41,41]
-});}
-const ICON = { base: mk('blue'), hub: mk('grey'), day: mk('green'), food: mk('orange') };
+const DAYS = [
+  {date:'Oct 9, Thu', city:'Lucerne', title:'Arrive Zurich → Lucerne',
+   weather:{avg:'12–16°C', note:'Crisp, partly sunny'}, // placeholder
+   travel:[{mode:'train', from:'ZRH', to:'Lucerne', time:'~1h10', km:'~67 km'}],
+   slots:[
+     {when:'12:30–13:30', what:'Lunch · Pfistern (river balcony)', link:'https://www.zunfthausrestaurant-pfistern.ch/'},
+     {when:'14:00–16:30', what:'Old Town loop · Chapel Bridge → Jesuit Church → Spreuer Bridge'},
+     {when:'17:00–18:30', what:'Musegg Wall & Zytturm views'},
+     {when:'19:30', what:'Dinner · Old Swiss House', link:'https://www.oldswisshouse.ch/'}
+   ],
+   food:[
+     {name:'Pfistern', why:'Lake fish & rösti on a medieval balcony', link:'https://www.zunfthausrestaurant-pfistern.ch/'},
+     {name:'Old Swiss House', why:'Tableside schnitzel theatre', link:'https://www.oldswisshouse.ch/'}
+   ],
+   nearby:[{name:'KKL lakefront', why:'Evening reflections'}],
+   map:{
+     pins:[
+       {kind:'base', label:'Lucerne (Base)', at:'Lucerne'},
+       {kind:'hub', label:'Zurich Airport', at:'ZRH'}
+     ],
+     legs:[['ZRH','Lucerne','train','Lucerne ←→ Zurich Airport · ~67 km · 1h10']]
+   }
+  },
+  {date:'Oct 10, Fri', city:'Lucerne', title:'Lake Promenade + Transport Museum',
+   weather:{avg:'11–15°C', note:'Partly cloudy'},
+   travel:[],
+   slots:[
+     {when:'09:30–11:00', what:'Lake Promenade · Schweizerhofquai → Hofkirche'},
+     {when:'11:30–13:00', what:'Short lake cruise to Weggis/Vitznau'},
+     {when:'15:00–17:00', what:'Swiss Museum of Transport + Chocolate Adventure'}
+   ],
+   food:[
+     {name:'Seehotel Hermitage (terrace)', why:'Lunch with lake view', link:'https://www.hermitage.ch/en/'},
+     {name:'Wirtshaus Galliker', why:'Luzerner Chügelipastete (heritage)', link:'https://maps.app.goo.gl/6S2d4tP6FbXJHbcn6'}
+   ],
+   nearby:[{name:'Hofkirche', why:'Twin‑tower landmark'}],
+   map:{pins:[{kind:'base', label:'Lucerne', at:'Lucerne'}], legs:[]}
+  },
+  {date:'Oct 11, Sat', city:'Lucerne', title:'Rigi Loop (boat + cog + cable)',
+   weather:{avg:'6–12°C', note:'Clearer a.m.'},
+   travel:[
+     {mode:'boat', from:'Lucerne', to:'Vitznau', time:'~1h'},
+     {mode:'cog', from:'Vitznau', to:'RigiKaltbad', time:'~25m'},
+     {mode:'cog', from:'RigiKaltbad', to:'RigiKulm', time:'~30m'},
+     {mode:'cable', from:'RigiKaltbad', to:'Weggis', time:'~10m'},
+     {mode:'boat', from:'Weggis', to:'Lucerne', time:'~45m'},
+   ],
+   slots:[
+     {when:'08:12', what:'Boat Lucerne → Vitznau (right side views)'},
+     {when:'09:20–10:30', what:'Cogwheel to Rigi Kaltbad · Rigiland playground'},
+     {when:'10:30–11:00', what:'Continue to Rigi Kulm (panorama)'},
+     {when:'12:00', what:'Lunch · BärgGnuss (Älplermagronen)'},
+     {when:'13:30–15:00', what:'Spa or ridge stroll'},
+     {when:'15:30–16:30', what:'Cable to Weggis · boat back'}
+   ],
+   food:[{name:'BärgGnuss', why:'Cozy alpine lunch with views', link:'https://www.baerggnuss.ch/'}],
+   nearby:[{name:'Mineralbad Rigi Kaltbad', why:'Warm pools with windows to the Alps'}],
+   map:{
+     pins:[
+       {kind:'base', label:'Lucerne', at:'Lucerne'},
+       {kind:'hub', label:'Vitznau pier', at:'Vitznau'},
+       {kind:'day', label:'Rigi Kaltbad', at:'RigiKaltbad'},
+       {kind:'day', label:'Rigi Kulm', at:'RigiKulm'},
+       {kind:'hub', label:'Weggis cable', at:'Weggis'}
+     ],
+     legs:[
+       ['Lucerne','Vitznau','regional','Boat · ~1h'],
+       ['Vitznau','RigiKaltbad','regional','Cog · ~25m'],
+       ['RigiKaltbad','RigiKulm','regional','Cog · ~30m'],
+       ['RigiKaltbad','Weggis','regional','Cable · ~10m'],
+       ['Weggis','Lucerne','regional','Boat · ~45m']
+     ]
+   }
+  },
+  {date:'Oct 12, Sun', city:'Lucerne', title:'Titlis Snow Day (Engelberg)',
+   weather:{avg:'-3–4°C (summit)', note:'Cold, bright'},
+   travel:[{mode:'train', from:'Lucerne', to:'Engelberg', time:'43m'}],
+   slots:[
+     {when:'08:00', what:'Train Lucerne → Engelberg'},
+     {when:'09:15–09:45', what:'Titlis Xpress + Rotair to summit (3,020 m)'},
+     {when:'10:00–14:00', what:'Cliff Walk, Glacier Cave, snow play'},
+     {when:'12:30', what:'Lunch · Panorama Restaurant'}
+   ],
+   food:[{name:'Panorama Restaurant', why:'Big windows over snowfields', link:'https://www.titlis.ch/en'}],
+   nearby:[{name:'Trübsee stop', why:'Playground & lake'}],
+   map:{
+     pins:[
+       {kind:'base', label:'Lucerne', at:'Lucerne'},
+       {kind:'day', label:'Engelberg (Titlis valley)', at:'Engelberg'}
+     ],
+     legs:[['Lucerne','Engelberg','train','Train · 43m']]
+   }
+  },
+  {date:'Oct 13, Mon', city:'Monopoli', title:'Fly Zurich → Bari · Base Monopoli',
+   weather:{avg:'20–23°C', note:'Mild, breezy'},
+   travel:[
+     {mode:'train', from:'Lucerne', to:'ZRH', time:'1h10', km:'~67 km'},
+     {mode:'flight', from:'ZRH', to:'Bari', time:'1h50', km:'~950 km'},
+     {mode:'regional', from:'Bari', to:'Monopoli', time:'30m', km:'~45 km'}
+   ],
+   slots:[
+     {when:'17:00–18:30', what:'Bastione Santa Maria sunset · Cala Porta Vecchia dip'},
+     {when:'20:00', what:'Dinner · Osteria Perricci', link:'https://maps.app.goo.gl/D3jPbAvhbxRMVcnG9'}
+   ],
+   food:[
+     {name:'Osteria Perricci', why:'Harbour classic · zuppa di pesce'},
+     {name:'Casa del Gelato', why:'Evening gelato on the bastions'}
+   ],
+   nearby:[{name:'Porto Vecchio', why:'Old harbour with fishing boats'}],
+   map:{
+     pins:[
+       {kind:'hub', label:'Zurich Airport', at:'ZRH'},
+       {kind:'hub', label:'Bari (hub)', at:'Bari'},
+       {kind:'base', label:'Monopoli (Base)', at:'Monopoli'}
+     ],
+     legs:[
+       ['Lucerne','ZRH','train','Train · ~1h10 (~67 km)'],
+       ['ZRH','Bari','flight','Flight · ~1h50 (~950 km)'],
+       ['Bari','Monopoli','regional','Regionale · 30m (~45 km)']
+     ]
+   }
+  },
+  {date:'Oct 14, Tue', city:'Monopoli', title:'Polignano a Mare day',
+   weather:{avg:'20–22°C', note:'Partly sunny'},
+   travel:[{mode:'regional', from:'Monopoli', to:'Polignano', time:'10–15m'}],
+   slots:[
+     {when:'AM', what:'Terrazza S. Stefano · Lama Monachile cove'},
+     {when:'13:00', what:'Lunch · Pescaria (seafood panini)', link:'https://www.pescaria.it/'}
+   ],
+   food:[{name:'Pescaria', why:'Best quick seafood rolls'}],
+   nearby:[{name:'Grotta Palazzese view terrace', why:'Iconic cliff hotel (drink stop)'}],
+   map:{
+     pins:[
+       {kind:'base', label:'Monopoli', at:'Monopoli'},
+       {kind:'day', label:'Polignano a Mare', at:'Polignano'}
+     ],
+     legs:[['Monopoli','Polignano','regional','Train · 10–15m']]
+   }
+  },
+  {date:'Oct 15, Wed', city:'Monopoli', title:'Alberobello + Locorotondo',
+   weather:{avg:'18–21°C', note:'Mild'},
+   travel:[
+     {mode:'alt', from:'Monopoli', to:'Alberobello', time:'~1–1.5h (train/bus)'},
+     {mode:'alt', from:'Alberobello', to:'Locorotondo', time:'~15m'},
+   ],
+   slots:[
+     {when:'AM', what:'Alberobello · Rione Monti & Aia Piccola (trulli)'},
+     {when:'12:30', what:'Lunch · Trattoria Terra Madre', link:'https://www.terramadrealberobello.it/'},
+     {when:'PM', what:'Locorotondo · belvedere views & white balconies'}
+   ],
+   food:[{name:'Terra Madre', why:'Garden‑to‑table orecchiette'}],
+   nearby:[{name:'Itria Valley', why:'Vineyards & dry‑stone walls'}],
+   map:{
+     pins:[
+       {kind:'base', label:'Monopoli', at:'Monopoli'},
+       {kind:'day', label:'Alberobello', at:'Alberobello'},
+       {kind:'day', label:'Locorotondo', at:'Locorotondo'}
+     ],
+     legs:[
+       ['Monopoli','Alberobello','regional','Train/bus · ~1–1.5h'],
+       ['Alberobello','Locorotondo','regional','Local link · ~15m'],
+       ['Locorotondo','Monopoli','regional','Return · ~1h']
+     ]
+   }
+  },
+  {date:'Oct 16, Thu', city:'Monopoli', title:'Ostuni + Monopoli coves',
+   weather:{avg:'18–21°C', note:'Breezy'},
+   travel:[{mode:'regional', from:'Monopoli', to:'Ostuni', time:'35–45m + taxi 10m'}],
+   slots:[
+     {when:'AM', what:'Ostuni · white city lanes & cathedral square'},
+     {when:'12:30', what:'Lunch · Osteria del Tempo Perso', link:'https://www.osteriadeltempoperso.com/'},
+     {when:'PM', what:'Porto Bianco/Nero swim back in Monopoli'}
+   ],
+   food:[
+     {name:'Osteria del Tempo Perso', why:'Atmospheric cave dining'},
+     {name:'Terrazzamare (aperitivo)', why:'Rooftop over the sea wall'}
+   ],
+   nearby:[{name:'Olive groves below Ostuni', why:'Views over Adriatic'}],
+   map:{
+     pins:[
+       {kind:'base', label:'Monopoli', at:'Monopoli'},
+       {kind:'day', label:'Ostuni', at:'Ostuni'}
+     ],
+     legs:[['Monopoli','Ostuni','regional','Train · 35–45m + taxi']]
+   }
+  },
+  {date:'Oct 17, Fri', city:'Monopoli', title:'Slow Monopoli',
+   weather:{avg:'19–22°C', note:'Calm'},
+   travel:[],
+   slots:[
+     {when:'AM', what:'Fish market & Porto Vecchio'},
+     {when:'13:00', what:'Lunch · Piazza Palmieri'},
+     {when:'20:00', what:'Dinner · Angelo’s (refined Pugliese)'}
+   ],
+   food:[
+     {name:'Ristorante Piazza Palmieri', why:'Seasonal seafood on a quiet square'},
+     {name:'Angelo’s Ristorante', why:'Elegant final dinner'}
+   ],
+   nearby:[{name:'Bastione Santa Maria', why:'Golden‑hour stroll'}],
+   map:{pins:[{kind:'base', label:'Monopoli', at:'Monopoli'}], legs:[]}
+  },
+  {date:'Oct 18, Sat', city:'Monopoli', title:'Flex / Weather buffer',
+   weather:{avg:'18–21°C', note:'TBD'},
+   travel:[],
+   slots:[
+     {when:'Option sun', what:'Boat along Monopoli coves; repeat Polignano golden hour'},
+     {when:'Option cloud', what:'Martina Franca baroque old town + café sit'}
+   ],
+   food:[], nearby:[],
+   map:{pins:[{kind:'base', label:'Monopoli', at:'Monopoli'}], legs:[]}
+  },
+  {date:'Oct 19, Sun', city:'Rome', title:'Monopoli → Rome (one night)',
+   weather:{avg:'18–22°C', note:'Mild'},
+   travel:[{mode:'train', from:'Monopoli', to:'Rome', time:'~4h', km:'~490 km'}],
+   slots:[
+     {when:'PM', what:'Monti lanes → Forum/Colosseum exteriors'},
+     {when:'20:00', what:'Dinner · Roscioli', link:'https://www.salumeriaroscioli.com/'},
+     {when:'After', what:'Trevi Fountain by night'}
+   ],
+   food:[{name:'Roscioli', why:'Carbonara benchmark', link:'https://www.salumeriaroscioli.com/'}],
+   nearby:[{name:'Villa Borghese (for Oct 20 AM)', why:'Rowboats & skyline'}],
+   map:{
+     pins:[{kind:'base', label:'Rome (Monti)', at:'Rome'}],
+     legs:[['Monopoli','Rome','onward','Frecciarossa/Frecciargento · ~4h (~490 km)']]
+   }
+  },
+  {date:'Oct 20, Mon', city:'Rome', title:'Flight 15:45 → Bengaluru',
+   weather:{avg:'18–22°C', note:'Fair'},
+   travel:[{mode:'alt', from:'Rome', to:'FCO', time:'Taxi 45–60m (or Leonardo Express 32m)'}],
+   slots:[
+     {when:'AM', what:'Sant’Eustachio coffee · short Villa Borghese stroll'},
+     {when:'12:15', what:'Leave for FCO · buffer 2+ hrs'}
+   ],
+   food:[{name:'Sant’Eustachio Il Caffè', why:'Classic Roman espresso'}],
+   nearby:[],
+   map:{
+     pins:[{kind:'hub', label:'FCO Airport', at:'FCO'}],
+     legs:[['Rome','FCO','alt','Transfer · 45–60m (or 32m train)']]
+   }
+  }
+];
 
-// ---- Color palette for legs ----
-const C = { train:'#3EA6D6', flight:'#7B9FF2', regional:'#66C08B', onward:'#FF7B6B', alt:'#9aa0a6' };
+/* ===================== MAP ===================== */
+const map = L.map('map', {
+  center:[44.2,12.5], zoom:6,
+  maxBounds:[[35,5],[49,20]], minZoom:5
+});
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
 
-// ---- Convenience ----
-function addMarker(layer, lat, lon, icon, html){ L.marker([lat,lon],{icon}).addTo(layer).bindPopup(html); }
-function leg(layer, a, b, color, label, dash=false){
-  L.polyline([a,b], {color, weight: 3, opacity: 0.9, dashArray: dash ? '6 6' : null})
-   .addTo(layer).bindTooltip(label,{sticky:true});
+function icon(color){
+  return L.icon({
+    iconUrl:`https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+    iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-34],
+    shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png', shadowSize:[41,41]
+  });
+}
+const ICON = {base:icon('blue'), day:icon('green'), hub:icon('grey'), food:icon('orange')};
+
+const COLORS = {train:'#3EA6D6', flight:'#7B9FF2', regional:'#66C08B', onward:'#FF7B6B', alt:'#9aa0a6'};
+
+const layersByDay = []; // store feature groups to toggle focus
+
+function drawDay(dayIdx){
+  if(layersByDay[dayIdx]){ // already drawn
+    map.fitBounds(layersByDay[dayIdx].getBounds().pad(0.25));
+    return;
+  }
+  const LAY = L.featureGroup().addTo(map);
+  const d = DAYS[dayIdx];
+
+  // pins
+  (d.map?.pins||[]).forEach(p=>{
+    const pt = P[p.at]; if(!pt) return;
+    const ic = p.kind==='base'?ICON.base : p.kind==='day'?ICON.day : p.kind==='hub'?ICON.hub : ICON.food;
+    L.marker(pt,{icon:ic}).addTo(LAY).bindPopup(`<b>${p.label||p.at}</b>`);
+  });
+  // legs
+  (d.map?.legs||[]).forEach(([from,to,kind,label])=>{
+    const a=P[from], b=P[to]; if(!a||!b) return;
+    const color = COLORS[kind] || '#9aa0a6';
+    L.polyline([a,b],{color,weight:3,opacity:0.9, dashArray: (kind==='alt'?'6 6':null)})
+      .addTo(LAY).bindTooltip(label,{sticky:true});
+  });
+
+  layersByDay[dayIdx]=LAY;
+  map.fitBounds(LAY.getBounds().pad(0.25));
 }
 
-// ---- Master layers (toggle by day) ----
-const D09 = L.featureGroup(), D10 = L.featureGroup(), D11 = L.featureGroup(),
-      D12 = L.featureGroup(), D13 = L.featureGroup(), D14 = L.featureGroup(),
-      D15 = L.featureGroup(), D16 = L.featureGroup(), D17 = L.featureGroup(),
-      D18 = L.featureGroup(), D19 = L.featureGroup(), D20 = L.featureGroup();
+/* ===================== UI: TIMELINE + PANEL ===================== */
+const T = document.getElementById('timeline');
+DAYS.forEach((d,i)=>{
+  const el = document.createElement('div');
+  el.className='day'; el.dataset.idx=i;
+  el.innerHTML = `<div class="t">${d.date} — ${d.city}</div><div class="s">${d.title}</div>`;
+  el.onclick = ()=>selectDay(i);
+  T.appendChild(el);
+});
+function clearActive(){[...document.querySelectorAll('.day')].forEach(n=>n.classList.remove('active'));}
+function selectDay(i){
+  clearActive();
+  const node = document.querySelector(`.day[data-idx="${i}"]`);
+  if(node) node.classList.add('active');
+  drawDay(i);
+  renderPanel(i);
+}
+function chip(txt){ return `<span class="tag">${txt}</span>`; }
 
-// ---- Key coords ----
-const Lucerne=[47.0502,8.3093], ZRH=[47.4515,8.5646], Milan=[45.484,9.204],
-      Bari=[41.1171,16.8719], Monopoli=[40.9508,17.3026], Polignano=[40.9963,17.2208],
-      Alberobello=[40.7833,17.2333], Locorotondo=[40.755,17.327], Ostuni=[40.7310,17.5776],
-      Rome=[41.9028,12.4964], FCO=[41.7999,12.2462], Engelberg=[46.821,8.405],
-      Vitznau=[47.013,8.487], Weggis=[47.032,8.432], RigiKaltbad=[47.045,8.465], RigiKulm=[47.058,8.486];
+function renderPanel(i){
+  const d = DAYS[i];
+  document.getElementById('panel-title').textContent = `${d.date} · ${d.city}`;
+  document.getElementById('panel-sub').textContent = d.title;
 
-// ---- Day 09 (Arrive Switzerland → Lucerne) ----
-addMarker(D09, Lucerne[0], Lucerne[1], ICON.base, `
-  <div class="popup">
-    <h3>Lucerne <span class="pill">Base · Oct 9–13</span></h3>
-    <div class="muted"><span class="key">14:00–16:30</span> Old Town loop — Kapellbrücke, Jesuit Church, Spreuer Bridge.</div>
-    <ul>
-      <li><span class="key">17:00</span> Musegg Wall & Zytturm (roofline views)</li>
-      <li><span class="key">19:30</span> Dinner: <a target="_blank" href="https://www.zunfthausrestaurant-pfistern.ch/">Pfistern</a> / <a target="_blank" href="https://www.oldswisshouse.ch/">Old Swiss House</a></li>
-    </ul>
-  </div>
-`);
+  const body = [];
+  // Weather
+  body.push(`
+    <div class="section">
+      <h3>Expected Weather</h3>
+      <div class="row">
+        <div>${chip(d.weather.avg)} ${d.weather.note}</div>
+        <div class="muted">Live soon → add API key</div>
+      </div>
+    </div>
+  `);
+  // Travel
+  if(d.travel?.length){
+    body.push(`<div class="section"><h3>Travel</h3><div class="flow">`+
+      d.travel.map(t=>{
+        const cls = t.mode==='flight'?'seg fly':t.mode==='train'?'seg train':t.mode==='onward'?'seg onward':'seg';
+        const arrow = '→';
+        return `<span class="${cls}"> ${t.from} ${arrow} ${t.to} · ${t.time}${t.km?` · ${t.km}`:''}</span>`;
+      }).join('')+`</div></div>`);
+  }
+  // Places (time slots)
+  if(d.slots?.length){
+    body.push(`<div class="section"><h3>Plan</h3><div class="grid">`+
+      d.slots.map(s=>`<div class="card"><div class="row"><div><b>${s.when}</b></div><div class="muted">${d.city}</div></div>
+        <div>${ s.link ? `<a target="_blank" href="${s.link}">${s.what}</a>` : s.what }</div></div>`).join('')+
+      `</div></div>`);
+  }
+  // Restaurants
+  if(d.food?.length){
+    body.push(`<div class="section"><h3>Restaurants</h3><div class="grid">`+
+      d.food.map(f=>`<div class="card"><div><b>${f.name}</b></div><div class="muted">${f.why||''}</div>${ f.link?`<div><a target="_blank" href="${f.link}">Website</a></div>`:''}</div>`).join('')+
+      `</div></div>`);
+  }
+  // Nearby
+  if(d.nearby?.length){
+    body.push(`<div class="section"><h3>Places around</h3><div class="grid">`+
+      d.nearby.map(n=>`<div class="card"><div><b>${n.name}</b></div><div class="muted">${n.why||''}</div></div>`).join('')+
+      `</div></div>`);
+  }
 
-// ---- Day 10 (Lake & Museum) ----
-addMarker(D10, Lucerne[0], Lucerne[1], ICON.day, `
-  <div class="popup">
-    <h3>Lucerne — Lake & Museum <span class="pill">Oct 10</span></h3>
-    <ul>
-      <li><span class="key">09:30–11:00</span> Lake Promenade (Schweizerhofquai → Hofkirche)</li>
-      <li><span class="key">11:30–13:00</span> Short cruise to Weggis/Vitznau</li>
-      <li><span class="key">15:00–17:00</span> Swiss Museum of Transport + Chocolate Adventure</li>
-    </ul>
-  </div>
-`);
+  // Notes
+  body.push(`<div class="section"><div class="muted">Tip: click a travel chip to see the segment on the map. Toggle days from the left timeline.</div></div>`);
+  document.getElementById('panel-body').innerHTML = body.join('');
+}
 
-// ---- Day 11 (Rigi loop) ----
-addMarker(D11, Vitznau[0], Vitznau[1], ICON.hub, `
-  <div class="popup">
-    <h3>Rigi Day <span class="pill">Oct 11</span></h3>
-    <div class="muted"><span class="key">Boat</span> Lucerne→Vitznau; <span class="key">Cog</span> to Rigi Kaltbad/Kulm; <span class="key">Cable</span> to Weggis & boat back.</div>
-    <ul><li>Lunch: BärgGnuss (Älplermagronen)</li><li>Rigiland playground for Advay</li></ul>
-  </div>
-`);
-leg(D11, Lucerne, Vitznau, C.regional, 'Boat · ~1h · Lucerne → Vitznau');
-leg(D11, Vitznau, RigiKaltbad, C.regional, 'Cogwheel · ~25m · Vitznau → Rigi Kaltbad');
-leg(D11, RigiKaltbad, RigiKulm, C.regional, 'Cogwheel · ~30m · Kaltbad → Kulm');
-leg(D11, RigiKaltbad, Weggis, C.regional, 'Cable car · ~10m · Kaltbad → Weggis');
-leg(D11, Weggis, Lucerne, C.regional, 'Boat · ~45m · Weggis → Lucerne');
+/* Auto-select first day */
+selectDay(0);
 
-// ---- Day 12 (Titlis) ----
-addMarker(D12, Engelberg[0], Engelberg[1], ICON.day, `
-  <div class="popup">
-    <h3>Mount Titlis <span class="pill">Oct 12</span></h3>
-    <ul>
-      <li><span class="key">08:00</span> Train Lucerne→Engelberg (~43m)</li>
-      <li><span class="key">09:15</span> Titlis Xpress + Rotair to summit (3,020m)</li>
-      <li><span class="key">10:00–14:00</span> Cliff Walk, Glacier Cave, snow play</li>
-      <li>Lunch: Panorama Restaurant (hot chocolate, rösti)</li>
-    </ul>
-  </div>
-`);
-leg(D12, Lucerne, Engelberg, C.train, 'Train · 43m · Lucerne → Engelberg');
-
-// ---- Day 13 (Fly to Puglia · Monopoli base) ----
-addMarker(D13, ZRH[0], ZRH[1], ICON.hub, `
-  <div class="popup">
-    <h3>Zurich Airport <span class="pill">Oct 13 AM</span></h3>
-    <div class="muted">Train Lucerne→ZRH (~1h10). Flight to Bari (~1h50).</div>
-  </div>
-`);
-leg(D13, Lucerne, ZRH, C.train, 'Train · ~1h10 · Lucerne → ZRH');
-addMarker(D13, Bari[0], Bari[1], ICON.hub, `
-  <div class="popup"><h3>Bari (Hub)</h3><div class="muted">Airport → Centrale → Regionale to Monopoli.</div></div>
-`);
-leg(D13, ZRH, Bari, C.flight, 'Flight · ~1h50 · Zurich → Bari');
-addMarker(D13, Monopoli[0], Monopoli[1], ICON.base, `
-  <div class="popup">
-    <h3>Monopoli <span class="pill">Base · Oct 13–19</span></h3>
-    <ul>
-      <li><span class="key">17:00</span> Bastione Santa Maria sunset</li>
-      <li><span class="key">20:00</span> Dinner: <a target="_blank" href="https://maps.app.goo.gl/D3jPbAvhbxRMVcnG9">Osteria Perricci</a></li>
-    </ul>
-  </div>
-`);
-leg(D13, Bari, Monopoli, C.regional, 'Regionale · ~30m · Bari → Monopoli');
-
-// ---- Day 14 (Polignano) ----
-addMarker(D14, Polignano[0], Polignano[1], ICON.day, `
-  <div class="popup">
-    <h3>Polignano a Mare <span class="pill">Oct 14</span></h3>
-    <ul>
-      <li><span class="key">AM</span> Terrazza S. Stefano → Lama Monachile cove</li>
-      <li><span class="key">13:00</span> Lunch: <a target="_blank" href="https://www.pescaria.it/">Pescaria</a></li>
-    </ul>
-  </div>
-`);
-leg(D14, Monopoli, Polignano, C.regional, 'Train · 10–15m · Monopoli → Polignano');
-
-// ---- Day 15 (Alberobello + Locorotondo) ----
-addMarker(D15, Alberobello[0], Alberobello[1], ICON.day, `
-  <div class="popup">
-    <h3>Alberobello <span class="pill">Oct 15</span></h3>
-    <div class="muted">Rione Monti & Aia Piccola trulli districts.</div>
-    <ul><li>Lunch: Trattoria Terra Madre (garden orecchiette)</li></ul>
-  </div>
-`);
-addMarker(D15, Locorotondo[0], Locorotondo[1], ICON.day, `
-  <div class="popup">
-    <h3>Locorotondo <span class="pill">Oct 15 PM</span></h3>
-    <div class="muted">Belvedere views; white balconies & lanes.</div>
-  </div>
-`);
-leg(D15, Monopoli, Alberobello, C.alt, 'Regionale/bus · ~1–1.5h (or car 45m)', true);
-leg(D15, Alberobello, Locorotondo, C.alt, 'Local link · ~15m', true);
-leg(D15, Locorotondo, Monopoli, C.alt, 'Return · ~1h', true);
-
-// ---- Day 16 (Ostuni + coves) ----
-addMarker(D16, Ostuni[0], Ostuni[1], ICON.day, `
-  <div class="popup">
-    <h3>Ostuni <span class="pill">Oct 16</span></h3>
-    <ul>
-      <li><span class="key">AM</span> White City lanes & cathedral square</li>
-      <li>Lunch: <a target="_blank" href="https://www.osteriadeltempoperso.com/">Osteria del Tempo Perso</a> (cave)</li>
-      <li><span class="key">PM</span> Porto Bianco/Nero swim back in Monopoli</li>
-    </ul>
-  </div>
-`);
-leg(D16, Monopoli, Ostuni, C.alt, 'Train · 35–45m + 10m taxi', true);
-
-// ---- Day 17 (Slow Monopoli) ----
-addMarker(D17, Monopoli[0], Monopoli[1], ICON.day, `
-  <div class="popup">
-    <h3>Monopoli Slow Day <span class="pill">Oct 17</span></h3>
-    <ul>
-      <li><span class="key">AM</span> Fish market & Porto Vecchio</li>
-      <li><span class="key">13:00</span> Lunch: Ristorante Piazza Palmieri</li>
-      <li><span class="key">20:00</span> Dinner: Angelo’s (refined Pugliese)</li>
-    </ul>
-  </div>
-`);
-
-// ---- Day 18 (Flex/buffer) ----
-addMarker(D18, Monopoli[0], Monopoli[1], ICON.day, `
-  <div class="popup">
-    <h3>Buffer / Weather Flex <span class="pill">Oct 18</span></h3>
-    <ul>
-      <li>Option sun: Boat along coves, repeat Polignano golden hour</li>
-      <li>Option cloud: Martina Franca baroque stroll</li>
-    </ul>
-  </div>
-`);
-
-// ---- Day 19 (Rome one-night finale) ----
-addMarker(D19, Rome[0], Rome[1], ICON.base, `
-  <div class="popup">
-    <h3>Rome <span class="pill">Oct 19–20</span></h3>
-    <ul>
-      <li><span class="key">PM</span> Monti lanes → Forum/Colosseum exteriors</li>
-      <li><span class="key">20:00</span> Dinner: <a target="_blank" href="https://www.salumeriaroscioli.com/">Roscioli</a></li>
-      <li>Trevi Fountain after dinner</li>
-    </ul>
-  </div>
-`);
-leg(D19, Monopoli, Rome, C.onward, 'Frecciarossa/Frecciargento · ~4h · Monopoli → Rome');
-
-// ---- Day 20 (Fly home) ----
-addMarker(D20, FCO[0], FCO[1], ICON.hub, `
-  <div class="popup">
-    <h3>FCO (Rome Airport) <span class="pill">Oct 20</span></h3>
-    <div class="muted">Taxi 45–60m from Monti · Flight 15:45 → BLR.</div>
-  </div>
-`);
-leg(D20, Rome, FCO, C.alt, 'Transfer · 45–60m taxi (or Leonardo Express)', true);
-
-// ---- Add layers & legend ----
-const overlays = {
-  "Oct 9  · Arrive → Lucerne": D09,
-  "Oct 10 · Lake & Museum": D10,
-  "Oct 11 · Rigi loop": D11,
-  "Oct 12 · Titlis snow day": D12,
-  "Oct 13 · Fly to Puglia (Monopoli base)": D13,
-  "Oct 14 · Polignano a Mare": D14,
-  "Oct 15 · Alberobello + Locorotondo": D15,
-  "Oct 16 · Ostuni + coves": D16,
-  "Oct 17 · Slow Monopoli": D17,
-  "Oct 18 · Flex/Buffer": D18,
-  "Oct 19 · Rome": D19,
-  "Oct 20 · Fly home": D20
-};
-Object.values(overlays).forEach(layer=>layer.addTo(map));
-L.control.layers({}, overlays, {collapsed:false}).addTo(map);
-
-// Legend
-const lg = L.control({position:'bottomleft'});
-lg.onAdd = function(){
-  const d = L.DomUtil.create('div','legend');
-  d.innerHTML = `
-    <h4>Legend</h4>
-    <div class="lg-row"><span class="chip" style="background:${C.train}"></span> Intercity / regional train</div>
-    <div class="lg-row"><span class="chip" style="background:${C.flight}"></span> Flight</div>
-    <div class="lg-row"><span class="chip" style="background:${C.onward}"></span> Onward leg to Rome</div>
-    <div class="lg-row"><img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png" width="12"> Base</div>
-    <div class="lg-row"><img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png" width="12"> Hub</div>
-    <div class="lg-row"><img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png" width="12"> Day trip / activity</div>
-  `;
-  return d;
-};
-lg.addTo(map);
+/* ===================== Weather (optional live) ===================== */
+// If you want live weather, get a free API key at openweathermap.org,
+// then uncomment and set: const API_KEY = 'YOUR_KEY';
+// Use endpoints for daily forecast for Lucerne/Monopoli/Rome.
+// For now we show averages/placeholders above.
 </script>
 </body>
 </html>
